@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0b0a09">
+<title>Piano 88 — Concert Grand</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b0a09'/%3E%3Cg fill='%23f6f1e6'%3E%3Crect x='6' y='8' width='5' height='16' rx='1'/%3E%3Crect x='13' y='8' width='5' height='16' rx='1'/%3E%3Crect x='20' y='8' width='6' height='16' rx='1'/%3E%3C/g%3E%3Cg fill='%23c9a45c'%3E%3Crect x='9' y='8' width='3' height='10' rx='1'/%3E%3Crect x='16' y='8' width='3' height='10' rx='1'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="loader" id="loader">
+  <div class="loader-inner">
+    <div class="wordmark">Piano <em>88</em></div>
+    <div class="progress"><i id="progressBar"></i></div>
+    <p class="loader-text" id="loaderText">memuat sample…</p>
+  </div>
+</div>
+
+<main class="stage">
+  <header class="topbar">
+    <div class="titles">
+      <h1>Piano <em>88</em></h1>
+      <p class="sub">A0 – C8 · 52 putih · 36 hitam · Salamander Grand</p>
+    </div>
+
+    <div class="controls">
+      <button class="pedal" id="pedalBtn" type="button" aria-pressed="false" aria-label="Sustain pedal">
+        <span class="led" aria-hidden="true"></span>
+        <span>Sustain</span>
+      </button>
+      <label class="volume">
+        <span>Vol</span>
+        <input id="volume" type="range" min="0" max="1" step="0.01" value="0.85" aria-label="Volume">
+      </label>
+    </div>
+  </header>
+
+  <section class="piano" aria-label="Piano 88 tuts">
+    <div class="felt" aria-hidden="true"></div>
+    <div class="keyscroll" id="keyscroll">
+      <div class="keys" id="keys"></div>
+    </div>
+    <div class="rail">
+      <span class="hint"><b>Spasi</b> pedal</span>
+      <span class="hint"><b>←</b> <b>→</b> oktaf</span>
+      <span class="hint"><b>Z – M</b> bawah · <b>Q – I</b> atas</span>
+      <span class="octave" id="octaveTag">C3 – C5</span>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>Sample: Salamander Grand Piano (CC-BY 3.0, Alexander Holm)</span>
+    <span id="status">siap</span>
+  </footer>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
