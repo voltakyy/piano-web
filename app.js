@@ -124,12 +124,15 @@
   const buffers = new Map();   // anchor midi -> AudioBuffer
   let ready = false;
 
-  let outGain, noteBus, reverbSend, compressor, lowShelf, convolver;
+  let outGain, noteBus, reverbSend, compressor, lowShelf, convolver, rumble, limiter;
   const voices = new Map();    // midi -> { src, gain, started }
   const sustained = new Set(); // notes held by pedal after release
-  let pedalDown = false;
-  let volume = 0.85;
+  const MAX_SUSTAINED = 18;    // keeps a latched pedal from turning into mud
   const MAX_VOICES = 44;
+  let pedalDown = false;
+  let latchPedal = false;      // click = permanent sustain
+  let holdPedal = false;       // space / touch = momentary sustain
+  let volume = 0.85;
 
   function makeImpulse(seconds, decay) {
     const rate = ctx.sampleRate;
@@ -174,8 +177,25 @@
     noteBus.connect(compressor);
     reverbSend.connect(convolver);
     convolver.connect(compressor);
+
+    // Clean the very low end so stacked pedal notes stay defined.
+    rumble = ctx.createBiquadFilter();
+    rumble.type = 'highpass';
+    rumble.frequency.value = 34;
+    rumble.Q.value = 0.7;
+
+    // Brick-wall-ish limiter: many ringing voices must not pump or clip.
+    limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -3;
+    limiter.knee.value = 0;
+    limiter.ratio.value = 20;
+    limiter.attack.value = 0.002;
+    limiter.release.value = 0.12;
+
     compressor.connect(lowShelf);
-    lowShelf.connect(outGain);
+    lowShelf.connect(rumble);
+    rumble.connect(limiter);
+    limiter.connect(outGain);
     outGain.connect(ctx.destination);
   }
 
@@ -204,6 +224,13 @@
       g.gain.exponentialRampToValueAtTime(0.0001, t + rel);
       v.src.stop(t + rel + 0.03);
     } catch (e) { /* already stopped */ }
+    updateReverb();
+  }
+
+  function updateReverb() {
+    if (!reverbSend) return;
+    const load = Math.min(1, voices.size / 36);
+    reverbSend.gain.setTargetAtTime(0.17 * (1 - 0.62 * load), ctx.currentTime, 0.2);
   }
 
   function playNote(midi, velocity) {
@@ -247,22 +274,60 @@
     src.onended = () => { try { gain.disconnect(); lp.disconnect(); } catch (e) {} };
 
     voices.set(midi, { src, gain, started: t });
+    updateReverb();
+  }
+
+  /* Pedal-down release: keep the string ringing, but let it settle instead of
+     sitting at full level forever. Prevents the "washed out" build-up. */
+  function dampSustained(midi) {
+    const v = voices.get(midi);
+    if (!v) return;
+    const t = ctx.currentTime;
+    const level = Math.max(v.gain.gain.value, 0.0001);
+    v.gain.gain.cancelScheduledValues(t);
+    v.gain.gain.setValueAtTime(level, t);
+    v.gain.gain.exponentialRampToValueAtTime(Math.max(level * 0.4, 0.0002), t + 6.5);
   }
 
   function noteOff(midi) {
     if (!ready) return;
-    if (pedalDown) { sustained.add(midi); return; }
-    releaseVoice(midi);
+    if (!pedalDown) { releaseVoice(midi); return; }
+    if (!voices.has(midi)) return;
+
+    // Oldest ringing note gives way once the pedal has stacked too many.
+    if (sustained.size >= MAX_SUSTAINED) {
+      const oldest = sustained.values().next().value;
+      sustained.delete(oldest);
+      releaseVoice(oldest, 0.5);
+    }
+
+    sustained.delete(midi);
+    sustained.add(midi);
+    dampSustained(midi);
+    updateReverb();
   }
 
-  function setPedal(next) {
-    if (next === pedalDown) return;
+  function refreshPedal() {
+    const next = latchPedal || holdPedal;
+
+    if (next === pedalDown) {
+      pedalBtn.classList.toggle('is-latched', latchPedal);
+      pedalBtn.setAttribute('aria-label',
+        latchPedal ? 'Sustain permanen aktif — klik untuk mematikan' : 'Sustain pedal');
+      return;
+    }
+
     pedalDown = next;
     pedalBtn.setAttribute('aria-pressed', String(next));
+    pedalBtn.classList.toggle('is-latched', latchPedal);
+    pedalBtn.setAttribute('aria-label',
+      latchPedal ? 'Sustain permanen aktif — klik untuk mematikan' : 'Sustain pedal');
+
     if (!next) {
       for (const midi of sustained) releaseVoice(midi, 0.34);
       sustained.clear();
     }
+    updateReverb();
   }
 
   /* ------------------------------------------------------------------ *
@@ -408,7 +473,7 @@
     if (e.code === 'Space') {
       if (isTypingTarget(e.target)) return;
       e.preventDefault();
-      if (!e.repeat) setPedal(true);
+      if (!e.repeat) { holdPedal = true; refreshPedal(); }
       return;
     }
 
@@ -439,7 +504,8 @@
   window.addEventListener('keyup', (e) => {
     if (e.code === 'Space') {
       if (isTypingTarget(e.target)) return;
-      setPedal(false);
+      holdPedal = false;
+      refreshPedal();
       return;
     }
     const midi = heldKeys.get(e.code);
@@ -454,24 +520,22 @@
     heldKeys.clear();
     activePointers.forEach((midi) => { if (midi !== null) { releaseVisual(midi); noteOff(midi); } });
     activePointers.clear();
-    setPedal(false);
+    holdPedal = false;
+    refreshPedal();
   });
 
   /* ------------------------------------------------------------------ *
    * 8. Controls
    * ------------------------------------------------------------------ */
 
-  pedalBtn.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    setPedal(true);
+  // Click = latch (permanent sustain). Space = momentary hold.
+  pedalBtn.addEventListener('click', (e) => {
+    latchPedal = !latchPedal;
+    refreshPedal();
+    // Drop focus after a pointer click so Space stays "momentary".
+    if (e.detail) pedalBtn.blur();
+    if (ctx && ctx.state === 'suspended') ctx.resume();
   });
-  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) =>
-    pedalBtn.addEventListener(ev, () => setPedal(false))
-  );
-  pedalBtn.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); setPedal(true); }
-  });
-  pedalBtn.addEventListener('keyup', () => setPedal(false));
 
   volumeEl.addEventListener('input', () => {
     volume = Number(volumeEl.value);
@@ -482,12 +546,16 @@
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   keysEl.addEventListener('contextmenu', (e) => e.preventDefault());
 
+  refreshPedal();
+
   /* Debug hook — inspect the engine from the console. */
   window.piano88 = {
     get ready() { return ready; },
     get voices() { return voices.size; },
     get samples() { return buffers.size; },
+    get reverb() { return reverbSend ? +reverbSend.gain.value.toFixed(3) : 0; },
     get pedal() { return pedalDown; },
+    get latched() { return latchPedal; },
     ctx,
   };
 })();

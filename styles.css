@@ -119,7 +119,9 @@ body{
 .pedal{
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 9px;
+  min-width: 122px;
   padding: 8px 14px 8px 12px;
   border: 1px solid #332a21;
   border-radius: 999px;
@@ -149,6 +151,18 @@ body{
 .pedal[aria-pressed="true"] .led{
   background: var(--brass);
   box-shadow: 0 0 10px rgba(201,164,92,.75), inset 0 0 0 1px #e8c987;
+}
+
+/* latched: pedal stays down after release */
+.pedal.is-latched{
+  color: #1a1308;
+  border-color: #e6cd95;
+  background: linear-gradient(180deg, #e6c987 0%, #c9a45c 100%);
+  box-shadow: 0 0 18px -6px rgba(201,164,92,.55);
+}
+.pedal.is-latched .led{
+  background: #2b1f0c;
+  box-shadow: inset 0 0 0 1px #6b5325, 0 0 0 3px rgba(43,31,12,.25);
 }
 .pedal:focus-visible{ outline: 1px solid var(--brass); outline-offset: 3px; }
 

@@ -18,7 +18,8 @@ Lalu buka <http://localhost:5178>.
 | --- | --- |
 | Mainkan tuts | Klik / sentuh, atau seret melintasi tuts (glissando) |
 | Velocity | Klik makin ke bawah tuts = makin keras |
-| Sustain pedal | Tahan **Spasi**, atau tahan tombol **Sustain** (berguna di HP) |
+| Sustain permanen | Klik tombol **Sustain** (sekali = nyala dan tetap nyala, klik lagi = mati) |
+| Sustain sesaat | Tahan **Spasi** |
 | Keyboard komputer | Baris bawah `Z S X D C V G B H N J M` (satu oktaf kromatik) |
 | | Baris atas `Q 2 W 3 E R 5 T 6 Y 7 U I` (oktaf di atasnya) |
 | Ganti oktaf | **←** / **→** |
@@ -38,8 +39,13 @@ samples/*.mp3   15 titik sample (C1, A1, C2, A2 … C8)
 
 - Sample: **Salamander Grand Piano** (Yamaha C5), Alexander Holm — CC-BY 3.0.
 - 15 titik nada, setiap tuts lain di-*pitch-shift* maksimal ±1,5 semitone, jadi kualitas tetap wajar.
-- Rantai: buffer → lowpass (makin keras makin terang) → gain envelope → bus → compressor → low-shelf +3,5 dB @140 Hz → master.
+- Rantai: buffer → lowpass (makin keras makin terang) → gain envelope → bus → compressor → low-shelf +3,5 dB @140 Hz → highpass 34 Hz → limiter → master.
 - Reverb: impulse response dibuat di runtime (2,6 s noise decay), send 17%.
+- Anti-"berbayang" saat pedal permanen:
+  - maksimal **18 nada** yang ditahan; nada paling lama dilepas otomatis,
+  - nada yang ditahan pedal diredam pelan ke 40% dalam 6,5 s (bukan diam di level penuh),
+  - send reverb turun otomatis (sampai ±0,06) saat banyak nada berbunyi,
+  - limiter -3 dB menjaga output tidak pump/clip.
 
 ### Catatan soal Klavins Model 450
 
